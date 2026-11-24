@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
-from openai import OpenAI
+from openai import BadRequestError, OpenAI
 
 SLOTS = ("ingreep", "mechanisme", "verloop")
 # Een concrete reden noemt waar de beurt voor dient: een slot, een open vraag, een geschil, herstel of risico.
@@ -33,7 +33,7 @@ LEEG_LOGBOEK = {
 PROMPTS = Path(__file__).parent / "prompts"
 
 # >>> Kies hier welke prompt de Koning gebruikt: de naam van een bestand in prompts/ (zonder .py). <<<
-PROMPT = "prompt3"
+PROMPT = "prompt4"
 
 
 def laad_prompt():
@@ -312,6 +312,7 @@ class Koning:
         self.opties = {"reasoning_effort": os.environ["REASONING"]} if os.getenv("REASONING") else {}
         self.client = OpenAI(base_url=os.environ["OPENAI_BASE_URL"], api_key=os.environ["OPENAI_API_KEY"], max_retries=8)
         self._verbruik = []
+        self.json_modus = True  # valt terug op False als het endpoint response_format niet kent
 
     def neem_verbruik(self):
         """Verbruik sinds de vorige oproep, in het formaat van tel() in council.py."""
@@ -319,7 +320,16 @@ class Koning:
         return v
 
     def _vraag_llm(self, berichten):
-        r = self.client.chat.completions.create(model=self.model, messages=berichten, **self.opties)
+        # JSON-modus: het model moet een geldig JSON-object teruggeven. Kent het endpoint of model dat niet
+        # (400 Bad Request), dan zonder JSON-modus verder voor de rest van de run.
+        if self.json_modus:
+            try:
+                r = self.client.chat.completions.create(model=self.model, messages=berichten,
+                                                        response_format={"type": "json_object"}, **self.opties)
+            except BadRequestError:
+                self.json_modus = False
+        if not self.json_modus:
+            r = self.client.chat.completions.create(model=self.model, messages=berichten, **self.opties)
         if r.usage:
             details = getattr(r.usage, "prompt_tokens_details", None)
             self._verbruik.append({
@@ -348,7 +358,7 @@ class Koning:
             )},
         ]
         fout = None
-        for _ in range(2):  # één nieuwe poging als de keuze niet door de vangrails komt
+        for _ in range(3):  # twee nieuwe pogingen als de keuze niet door de vangrails komt, daarna de fallback
             try:
                 antwoord = self._vraag_llm(berichten)
                 keuze = _lees_json(antwoord)
@@ -381,7 +391,7 @@ class Koning:
             )},
         ]
         fout = None
-        for _ in range(2):  # één nieuwe poging met de foutmeldingen erbij
+        for _ in range(3):  # twee nieuwe pogingen met de foutmeldingen erbij
             try:
                 antwoord = self._vraag_llm(berichten)
                 ruw = _dict(_normaliseer(_lees_json(antwoord)))
@@ -407,7 +417,7 @@ class Koning:
         return verdict, [], {}, verdict["samenvatting"]
 
     def _fallback(self, beurten, fout):
-        """Geen geldige keuze na twee pogingen: kies eerlijk de Rol die het minst sprak, en zeg waarom."""
+        """Geen geldige keuze na drie pogingen: een eerlijke keuze in code, met de reden erbij."""
         aantal = {r: 0 for r in self.rollen}
         for b in beurten:
             if b["soort"] == "bericht" and b["spreker"] in aantal:
@@ -420,11 +430,31 @@ class Koning:
                      "Verwacht: ID's waarmee de Koning daarna andere Rollen gericht kan vragen wat er buiten het "
                      "datanet gebeurde.")
             return OPENER, vraag, reden, self.open_vragen
-        rol = min(self.rollen, key=lambda r: aantal[r])
-        open_slots = [s for s in SLOTS if _dict(_dict(self.logboek.get("slots")).get(s)).get("status") in (None, "onbekend")]
-        doel = ", ".join(open_slots) or "ingreep, mechanisme en verloop"
-        vraag = f"Wat zegt je bron over {doel}? Noem record-ID's, en naar welke Rol je bron verwijst."
-        waarom = ("sprak nog niet (eerste fase: iedereen één keer)" if aantal[rol] == 0 else
-                  "sprak het minst, dus zijn bron levert het meeste nieuwe op")
-        reden = f"Fallback: de Koning gaf geen geldige keuze ({fout}). Doel: open slots {doel}. De {rol} {waarom}."
+        stil = [r for r in self.rollen if aantal[r] == 0]
+        if stil:  # eerste fase: iedereen één keer
+            rol = stil[0]
+            open_slots = [s for s in SLOTS
+                          if _dict(_dict(self.logboek.get("slots")).get(s)).get("status") in (None, "onbekend")]
+            doel = ", ".join(open_slots) or "ingreep, mechanisme en verloop"
+            vraag = f"Wat zegt je bron over {doel}? Noem record-ID's, en naar welke Rol je bron verwijst."
+            reden = (f"Fallback: de Koning gaf geen geldige keuze ({fout}). Doel: open slots {doel}. "
+                     f"De {rol} sprak nog niet (eerste fase: iedereen één keer).")
+            return rol, vraag, reden, self.open_vragen
+        # Tweede fase: het zwakste slot (eerst onbekend, dan onbevestigd) bij de Rol die het langst niet sprak.
+        slots = _dict(self.logboek.get("slots"))
+        zwak = _onbevestigde_slots(self.logboek) or list(SLOTS)
+        slot = min(zwak, key=lambda s: _dict(slots.get(s)).get("status") not in (None, "onbekend"))
+        bewering = _tekst(_dict(slots.get(slot)).get("bewering"))
+        laatst = {r: -1 for r in self.rollen}
+        for i, b in enumerate(beurten):
+            if b["soort"] == "bericht" and b["spreker"] in laatst:
+                laatst[b["spreker"]] = i
+        rol = min(self.rollen, key=lambda r: laatst[r])
+        if bewering:
+            vraag = (f"Over het slot {slot} luidt de bewering: \"{bewering[:200]}\". Bevestigt of weerlegt jouw bron "
+                     "dat, met record-ID's?")
+        else:
+            vraag = f"Wat toont jouw bron over het slot {slot}: wie deed wat, of hoe werkte het? Noem record-ID's."
+        reden = (f"Fallback: de Koning gaf geen geldige keuze ({fout}). Doel: het slot {slot}, dat nog niet bevestigd "
+                 f"is door twee Rollen. Waarom de {rol}: die sprak het langst niet en kan het als tweede bron toetsen.")
         return rol, vraag, reden, self.open_vragen

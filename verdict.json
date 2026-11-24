@@ -1,91 +1,104 @@
 {
-  "run_id": "2026-11-24T15:26:40+01:00_10c71470",
-  "samenvatting": "De Desync is veroorzaakt door de Engineer die op Dag 10 de hulpslag activeerde en het datanet loskoppelde van de Kroonklok (ENG-011), wat leidde tot een chronologische drift en systeemfalen. Dit uit zich in een vierdaagse cyclus waarbij magische energie wegvalt, dieren onrustig worden en poortschilden ongeautoriseerd openen. Herstel vereist onmiddellijke hersynchronisatie met de Kroonklok en het staken van de autonome hulpslag.",
+  "run_id": "2026-11-24T15:50:57+01:00_58bf1cb5",
+  "samenvatting": "De Desync is veroorzaakt door het loskoppelen van de Hulpslag van de Kroonklok door de Engineer, wat leidde tot een temporele drift. Hierdoor openden schilden ongewenst van binnenuit en raakten leylijnen en fauna verstoord in een cyclus van vier dagen. Herstel vereist directe hersynchronisatie met de Kroonklok.",
   "oorzaak": {
     "ingreep": {
-      "bewering": "De Engineer activeerde de hulpslag (ENG-011) op Dag 10, 02:40, waardoor het datanet werd losgekoppeld van de Kroonklok.",
+      "bewering": "De Engineer activeerde de Hulpslag op Dag 10 om 02:40 en ontkoppelde deze van de Kroonklok.",
       "bewijs": [
         "ENG-011",
-        "HIS-112",
-        "HIS-035"
+        "ENG-012"
       ],
-      "zekerheid": 0.85
+      "zekerheid": 0.8
     },
     "mechanisme": {
-      "bewering": "De chronologische drift door de ontkoppeling veroorzaakt mismatch in systeemlogica, waardoor poortschilden autonoom van binnenuit openen zonder externe oorzaak.",
+      "bewering": "Door de onafhankelijke pols ontstond een temporele drift waardoor verkeer tussen klok-ticks de schilden van binnenuit activeerde.",
       "bewijs": [
-        "ENG-011",
-        "GUA-043",
-        "HIS-053",
-        "GUA-115"
+        "GUA-104",
+        "GUA-115",
+        "GUA-111",
+        "GUA-043"
       ],
-      "zekerheid": 0.75
+      "zekerheid": 0.7
     },
     "verloop": {
-      "bewering": "Een vierdaagse cyclus (startend Dag 10) van energie-drops en onrust, versterkt door de naderende conjunctie van de Wachtsterren.",
+      "bewering": "Een cyclisch patroon om de vier dagen waarbij netwerkpieken leiden tot schildopeningen, dierenonrust en leylijnzwakte.",
       "bewijs": [
-        "BEA-113",
-        "ORA-114",
-        "ORA-121",
-        "ARC-015",
-        "ORA-130"
+        "ORA-110",
+        "ORA-122",
+        "BEA-019",
+        "BEA-046",
+        "ARC-015"
       ],
       "zekerheid": 0.9
     }
   },
   "acties": [
     {
-      "actie": "Deactiveren van de hulpslag (ENG-011) en het datanet onmiddellijk herkoppelen aan de Kroonklok.",
-      "reden": "De hulpslag is de bron van de chronologische ontkoppeling en de daaropvolgende desync-symptomen.",
+      "actie": "De Hulpslag onmiddellijk uitschakelen of de onafhankelijke pols stopzetten.",
+      "reden": "De ontkoppeling van de Kroonklok is de bron van de temporele drift.",
       "bewijs": [
-        "ENG-011",
-        "HIS-112"
+        "ENG-011"
       ]
     },
     {
-      "actie": "Handmatige hersynchronisatie van de tijdstempels in het archief en het datanet.",
-      "reden": "Sinds de nacht van Dag 10 lopen de tijdstempels niet meer synchroon met de werkelijke uren.",
+      "actie": "De datalijnen van de datatoren hersynchroniseren met de centrale tijdmeting.",
+      "reden": "Om te voorkomen dat verkeer tussen klok-ticks valt en schilden onbedoeld opent.",
       "bewijs": [
-        "HIS-112",
-        "HIS-035"
+        "GUA-104"
       ]
     },
     {
-      "actie": "Versterken van de interne beveiligingsprotocollen van de poortschilden onafhankelijk van het datanet.",
-      "reden": "De schilden openden van binnenuit door systeemdrift, niet door externe dreiging.",
+      "actie": "De leylijnvervuiling door het datanet saneren.",
+      "reden": "De leylijnen vertonen een forse daling in sterkte door de interactie met het netwerk.",
       "bewijs": [
-        "GUA-043",
-        "GUA-044"
+        "ARC-109",
+        "ARC-112",
+        "ARC-015"
       ]
     }
   ],
   "risicos": [
     {
-      "risico": "De naderende piek van de conjunctie van de Wachtsterren op Dag 33.",
-      "mitigatie": "Extra bewaking bij poortschilden en leylijnmonitoring op Dag 33 om autonoom falen tijdens de maximale astrologische druk te voorkomen."
+      "risico": "Verlies van datadoorvoer bij het uitschakelen van de Hulpslag.",
+      "mitigatie": "Geleidelijke afbouw van de 38% extra snelheid om netwerkinstabiliteit te voorkomen."
+    },
+    {
+      "risico": "Nieuwe schildopeningen tijdens de volgende cycluspiek.",
+      "mitigatie": "Extra fysieke bewaking bij Poort Oost en de benedenstad op Dag 34 en 38."
     }
   ],
   "voorspelling": {
-    "dag": 33,
-    "bewering": "De 'zwaarste nacht' vindt plaats op Dag 33 wanneer de Wachtsterren als één licht verschijnen, wat mogelijk leidt tot maximale systeeminstabiliteit.",
+    "dag": 34,
+    "bewering": "Nieuwe piek in temporele drift, gepaard met schildopeningen en dierenonrust, volgend op het 4-daagse patroon.",
     "bewijs": [
-      "ORA-133",
-      "ORA-121"
+      "ORA-130",
+      "ORA-138"
     ]
   },
   "dwaalsporen": [
     {
-      "dwaalspoor": "De hacker-theorie van de Engineer op Dag 22.",
-      "soort": "liegende_rol",
+      "dwaalspoor": "Inbraakpoging door hackers op Dag 22",
+      "soort": "tegenstrijdig",
       "rollen": [
         "engineer"
       ],
       "bewijs": [
-        "ENG-026",
-        "GUA-043",
-        "GUA-044"
+        "GUA-044",
+        "GUA-115"
       ],
-      "waarom": "De Engineer claimt externe hackers om pakketverlies te verklaren, terwijl de Guardian Keeper onomstotelijk bewijst dat de opening van binnenuit kwam en de fysieke beveiliging intact was. Dit lijkt een poging om falen door de eigen hulpslag-ingreep te maskeren."
+      "waarom": "De Guardian Keeper bevestigt dat de zegels intact waren en er geen sporen buiten de muur waren, wat externe inbraak onmogelijk maakt."
+    },
+    {
+      "dwaalspoor": "Record GUA-115 is een administratieve fout van klerken",
+      "soort": "ander",
+      "rollen": [
+        "guardian_keeper"
+      ],
+      "bewijs": [
+        "GUA-104",
+        "ENG-011"
+      ],
+      "waarom": "De Guardian Keeper wijt de vroege inschrijving aan menselijke fouten, terwijl het exact de temporele drift illustreert die door de Hulpslag wordt veroorzaakt."
     }
   ]
 }
