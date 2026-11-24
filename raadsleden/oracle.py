@@ -1,5 +1,6 @@
-"""Raadslid: de Oracle. Kopieer dit bestand om een nieuw Raadslid toe te voegen."""
+"""Raadslid: de Oracle. Perspectief en Belang komen van de publieke Rolkaart (rolkaarten.md)."""
 
-ROL = "oracle"  # moet een Rol uit het schema zijn: archmage, engineer, guardian_keeper, historian, oracle, beast_master
+ROL = "oracle"
 NAAM = "Oracle"
 PERSPECTIEF = "Leest visioenen en tekenen; zoekt het patroon in wat komt."
+BELANG = "gezag van de profetieën"  # publiek Belang van de Rolkaart: de Koning gebruikt dit om partijdigheid in te schatten
