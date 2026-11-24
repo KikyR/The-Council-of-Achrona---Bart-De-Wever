@@ -197,7 +197,8 @@ function render(trace, verdict) {
     vd.innerHTML = `<div class="slot"><b>Samenvatting</b>${verdict.samenvatting === "TODO" ? '<span class="leeg">TODO</span>' : opmaak(verdict.samenvatting)}</div>`
       + slot("Ingreep", o.ingreep) + slot("Mechanisme", o.mechanisme) + slot("Verloop", o.verloop)
       + `<div class="slot"><b>Herstelplan</b><ol>${(verdict.acties || []).map(a => `<li>${opmaak(a.actie)}</li>`).join("")}</ol></div>`
-      + `<div class="slot"><b>Risico's</b><ol>${(verdict.risicos || []).map(r => `<li>${opmaak(r.risico)}</li>`).join("")}</ol></div>`;
+      + `<div class="slot"><b>Risico's</b><ol>${(verdict.risicos || []).map(r => `<li>${opmaak(r.risico)}</li>`).join("")}</ol></div>`
+      + ((verdict.dwaalsporen || []).length ? `<div class="slot"><b>Dwaalsporen</b><ol>${verdict.dwaalsporen.map(d => `<li>${opmaak(d.soort + ": " + d.dwaalspoor + " (" + d.waarom + ")")} ${(d.bewijs || []).map(i => opmaak(i)).join(" ")}</li>`).join("")}</ol></div>` : "");
   }
 }
 

@@ -4,6 +4,7 @@ Start met `uv run council`. Schrijft verdict.json en trace.json in de root van d
 De Koning leidt het debat in `kies_volgende()`: hij beslist wie spreekt, met welke vraag en waarom.
 """
 import asyncio
+import copy
 import json
 import os
 import sys
@@ -18,6 +19,7 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 import raadsleden
+from koning import Koning
 
 ROOT = Path(__file__).parent
 KENNISBRONNEN = ROOT / "kennisbronnen"
@@ -25,39 +27,23 @@ ROLLEN = ("archmage", "engineer", "guardian_keeper", "historian", "oracle", "bea
 BEURTENBUDGET = 10  # spelregel: maximaal 10 Raadslid-beurten (berichten van Raadsleden) per run
 
 
-def kies_volgende(beurten, leden):
+def kies_volgende(beurten, leden, koning):
     """De Koning leidt het debat: hij beslist wie spreekt. De kit roept deze functie op vóór elke beurt.
     (In AI-termen heet dit deel een orchestrator.)
 
     Je krijgt:
-      beurten  het debat tot nu toe, dezelfde lijst als in trace.json. Een bericht van een
-               Raadslid ziet er zo uit: {"soort": "bericht", "spreker": "engineer", "tekst": "..."}
-      leden    de Raadsleden uit raadsleden/, elk met .ROL, .NAAM en .PERSPECTIEF
+      beurten  het debat tot nu toe, dezelfde lijst als in trace.json
+      leden    de Raadsleden uit raadsleden/, elk met .ROL, .NAAM, .PERSPECTIEF, .BELANG, .NEIGING, .BLINDE_VLEK
+      koning   de Koning als agent (koning.py), met zijn logboek
 
     Je geeft terug:
-      (rol, vraag, reden)   wie nu spreekt, welke vraag die krijgt en waarom je hem kiest
-      (None, None, reden)   het debat stopt, met de reden waarom
-    De reden komt in de trace en in de viewer. De jury leest ze: maak ze concreet.
-
-    TODO voor jullie team:
-    Nu praat iedereen om de beurt, in een vaste volgorde, ook als dat niets toevoegt. Er zijn maar
-    10 Raadslid-beurten, dus zo verspil je beurten. Laat de Koning in deze functie naar het debat
-    kijken en elke beurt bewust kiezen. Vragen om mee te starten:
-      - Wie heeft nog niet gesproken, en wiens kennis ontbreekt nog?
-      - Iemand verwijst naar een andere Rol of doet een bewering: wie kan dat controleren?
-      - Welke delen van de oorzaak (ingreep, mechanisme, verloop) zijn nog onbekend?
-      - Weet de Council genoeg? Stop dan zelf, vóór het budget op is.
-    Twee manieren (of een mix):
-      - regels in code, bv. "wie genoemd wordt, moet het toetsen";
-      - een agent: de Koning als LLM die het debat leest en (rol, vraag, reden) teruggeeft.
-        Meestal sneller gebouwd en slimmer dan regels: zie "Regels of een agent?" in de README.
+      (rol, vraag, reden, open_vragen)   wie nu spreekt, welke vraag, waarom, en wat nog open staat
+      (None, None, reden, open_vragen)   de Koning stopt het debat zelf, met de reden waarom
+    De reden komt in de trace en in de viewer. De jury leest ze: daarom vraagt koning.py een vast
+    formaat (doel, waarom deze Rol, verwacht) en weigert het vage redenen.
     """
-    rondes = int(os.getenv("RONDES", "2"))
     gesproken = sum(1 for b in beurten if b["soort"] == "bericht" and b["spreker"] in ROLLEN)
-    if gesproken >= rondes * len(leden):
-        return None, None, "vaste volgorde: alle rondes gespeeld"
-    lid = leden[gesproken % len(leden)]
-    return lid.ROL, "Geef je inbreng in hoogstens 150 woorden. Reageer op wat de anderen zeiden.", "vaste volgorde"
+    return koning.kies(beurten, BEURTENBUDGET - gesproken)
 
 
 def controleer(leden):
@@ -91,14 +77,26 @@ def kennisbron_bestanden(rol):
 
 
 def instructies(lid, bestanden, mcp):
+    # Alleen gedragsregels: geen inhoud uit de Kennisbronnen (spelregel).
     tekst = (
         f"Je bent de {lid.NAAM}, een Raadslid in de Council of Achrona. {lid.PERSPECTIEF}\n"
-        "Je debatteert met de andere Raadsleden over de oorzaak van de Desync. "
-        "Baseer je alleen op je eigen Kennisbron en noem bij elke bewering de record-ID's precies zoals ze in je Kennisbron staan. Verzin nooit een ID. "
-        "Zeg het eerlijk als je iets niet weet."
+        "Je debatteert met de andere Raadsleden over de oorzaak van de Desync. De Koning leidt het debat en stelt je "
+        "telkens een gerichte vraag. Er zijn maar 10 Raadslid-beurten voor de hele Council: maak je beurt waardevol.\n\n"
+        "Zo antwoord je:\n"
+        "1. Baseer je alleen op je eigen Kennisbron. Noem bij elke bewering de record-ID's precies zoals ze in je "
+        "Kennisbron staan, met een gewoon koppelteken (bv. ABC-123). Verzin nooit een ID of feit.\n"
+        "2. Beantwoord elk deel van de vraag van de Koning, punt per punt.\n"
+        "3. Reageer op beweringen van andere Raadsleden die je bron raakt: bevestig of weerleg ze met je eigen ID's. "
+        "Zeg het expliciet als je het oneens bent.\n"
+        "4. Wees eerlijk over de grenzen van je bron: wat kan ze niet aantonen, en kan ze je eigen domein uitsluiten "
+        "als oorzaak? Weet je iets niet, zeg dat.\n"
+        "5. Verwijst je bron naar een andere Rol? Meld naar wie en waarover.\n"
+        "6. Herhaal of vat niet samen wat al gezegd is: alleen nieuwe informatie, bevestiging of weerlegging. "
+        "Hoogstens ongeveer 200 woorden."
     )
     if mcp:
-        tekst += "\nLees of doorzoek je Kennisbron met je tools voor je spreekt."
+        tekst += ("\n\nDoorzoek je Kennisbron grondig met je tools voor je antwoordt: zoeken kost geen beurt, "
+                  "alleen je antwoord telt.")
     elif bestanden:
         tekst += "\n\nJe Kennisbron:\n\n" + "\n\n".join(f"## {p.name}\n\n{p.read_text(encoding='utf-8')}" for p in bestanden)
     else:
@@ -141,6 +139,7 @@ async def run():
         bewaar("trace.json", trace)  # na elke beurt: de viewer (`uv run viewer`) toont het debat live
 
     klein = client("MODEL_KLEIN")
+    koning = Koning(leden)  # leidt het debat; leest geen Kennisbron
 
     async with AsyncExitStack() as stack:
         agents = []
@@ -168,15 +167,22 @@ async def run():
         while True:
             gesproken = sum(1 for b in beurten if b["soort"] == "bericht" and b["spreker"] in per_rol)
             if gesproken >= BEURTENBUDGET:
-                rol, vraag, reden = None, None, f"Beurtenbudget op ({BEURTENBUDGET} Raadslid-beurten)"
+                rol, vraag, reden, open_vragen = None, None, f"Beurtenbudget op ({BEURTENBUDGET} Raadslid-beurten)", koning.open_vragen
             else:
-                rol, vraag, reden = kies_volgende(beurten, leden)
+                trace["aan_het_woord"] = "koning"  # de viewer toont dat de Koning nadenkt
+                bewaar("trace.json", trace)
+                # In een aparte thread: de LLM-call van de Koning blokkeert de MCP-verbindingen niet.
+                rol, vraag, reden, open_vragen = await asyncio.to_thread(kies_volgende, beurten, leden, koning)
+                for u in koning.neem_verbruik():
+                    tel(verbruik, "groot", u)
             if rol is not None and rol not in per_rol:
                 sys.exit(f"kies_volgende() koos {rol!r}, maar die Rol zit niet in raadsleden/.")
             if rol is not None:
                 ronde = gesproken // len(leden) + 1
-            # Elke keuze van de Koning staat in de trace: aan wie, welke vraag en waarom.
-            beurt(ronde, "koning", "routering", aan=rol, vraag=vraag, reden=reden)
+            # Elke keuze van de Koning staat in de trace: aan wie, welke vraag, waarom, wat nog open staat
+            # en zijn logboek (extra veld, mag volgens het schema).
+            beurt(ronde, "koning", "routering", aan=rol, vraag=vraag, reden=reden,
+                  open_vragen=open_vragen, logboek=copy.deepcopy(koning.logboek), prompt=koning.prompt_naam)
             print(f"\n[Koning] {'stopt' if rol is None else '→ ' + per_rol[rol][0].NAAM}: {reden}")
             if rol is None:
                 break
@@ -196,24 +202,15 @@ async def run():
     # De Koning heeft geen Rol en geen Kennisbron: hij kent alleen wat de Raadsleden inbrachten.
     trace["aan_het_woord"] = "koning"
     bewaar("trace.json", trace)
-    koning = Agent(client("MODEL_GROOT"), "Je bent de Koning van de Council of Achrona. Je hebt geen Kennisbron.", name="koning")
-    r = await koning.run(
-        options=opties,
-        messages="Debat:\n\n" + "\n\n".join(debat)
-        + "\n\nVat samen: waarover zijn de Raadsleden het eens, waarover niet, en welk bewijs (record-ID's) noemden ze?",
-    )
-    tel(verbruik, "groot", r.usage_details)
-    beurt(ronde + 1, "koning", "bericht", tekst=r.text)
-    print(f"\n[Koning]:\n{r.text}")
-
-    # TODO voor jullie team: laat de Council dit Verdict zelf invullen (zie schema/verdict.json).
-    verdict = {
-        "run_id": run_id,
-        "samenvatting": "TODO",
-        "oorzaak": {slot: {"bewering": None, "bewijs": []} for slot in ("ingreep", "mechanisme", "verloop")},
-        "acties": [{"actie": "TODO", "reden": "TODO"}],
-        "risicos": [{"risico": "TODO", "mitigatie": "TODO"}],
-    }
+    # De Koning weegt af en stelt het Verdict op uit het debat (koning.py): alleen ID's die een Raadslid
+    # echt noemde, gewone koppeltekens, en getoetst aan de schema's voor het wordt weggeschreven.
+    verdict, geschillen, afweging, slottekst = await asyncio.to_thread(koning.verdict, beurten, run_id)
+    for u in koning.neem_verbruik():
+        tel(verbruik, "groot", u)
+    trace["geschillen"] = geschillen
+    trace["afweging"] = afweging  # extra veld (mag volgens het schema): hoe de Koning per slot woog
+    beurt(ronde + 1, "koning", "bericht", tekst=slottekst)
+    print(f"\n[Koning]:\n{slottekst}")
     trace["status"], trace["aan_het_woord"] = "klaar", None
     bewaar("trace.json", trace)
     bewaar("verdict.json", verdict)
